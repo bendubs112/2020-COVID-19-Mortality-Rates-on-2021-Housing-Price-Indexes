@@ -22,12 +22,13 @@ An econometric analysis of 2020 county-level per-capita COVID-19 mortality rates
 |---|------|-------------|
 | 1 | `Data_Assignment_3.do` | Stata do-file that reads all raw data, cleans and merges into a final analysis dataset, and runs the regression. To replicate, change the global `root` macro on line 2 to your local path of the repository. |
 | 2 | `Data_Assignment_3_log.txt` | Log file produced by the do-file showing all results. |
-| 3 | `hist_mort_rate.png` | Histogram of county COVID-19 mortality rate, 2020. |
-| 4 | `hist_AnnualChange2021.png` | Histogram of county HPI annual change, 2021. |
-| 5 | `README.md` | This file. |
+| 3 | `covid_county_mortality.dta` | Final dataset created by cleaning and merging above datasets, used for econemetric analysis. |
+| 4 | `hist_mort_rate.png` | Histogram of county COVID-19 mortality rate, 2020. |
+| 5 | `hist_AnnualChange2021.png` | Histogram of county HPI annual change, 2021. |
+| 6 | `README.md` | This file. |
 
 ---
 
 ## Note
 
-The `intermediate datasets/` folder is included in this repository for reference but is not needed to replicate the results. The do-file generates all intermediate files automatically when run.
+The final dataset "covid_county_mortality.dta" is sufficient to run the code that executes the econometric analysis. If running the code that creates this dataset from the raw data files, first download those datasets to the appropriate directory and execute the code.
