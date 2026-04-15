@@ -1,0 +1,361 @@
+--------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3\Data_Assignment
+> _3_log.txt
+  log type:  text
+ opened on:  13 Apr 2026, 21:42:51
+
+. 
+. /*
+> 
+> ECON 388 STATA EXERCISE TEMPLATE
+> 
+>   Use this template DO file as the
+>   basis for all Stata exercises.
+> 
+>   For each assignment, make sure to
+>   enter your name and the problem 
+>   set number in the appropriate
+>   spaces below.
+> 
+> NAME: Ben Widgren
+> 
+> DATA ASSIGNMENT #3
+> 
+> 
+>   Begin your do file in the space 
+>   below the stars, adding additional
+>   lines as needed */
+. 
+. ************************************
+. * choose directory
+. cd "$orig"
+C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3\original datasets
+
+. 
+. *** Clean Datasets Before Merging ***
+. 
+. * clean the census data
+. import delimited "co-est2020-alldata", clear
+(encoding automatically selected: ISO-8859-1)
+(180 vars, 3,194 obs)
+
+. keep if sumlev == 50
+(51 observations deleted)
+
+. keep state county popestimate2020
+
+. gen county_fips = state*1000 + county
+
+. drop state county
+
+. 
+. cd "$inter"
+C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3\intermediate datasets
+
+. save "census_cleaned.dta", replace
+file census_cleaned.dta saved
+
+. 
+. * prepare ZIP_COUNTY dataset to merge with hpi data
+. cd "$orig"
+C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3\original datasets
+
+. import excel "ZIP_COUNTY_122020.xlsx", firstrow clear
+(6 vars, 54,194 obs)
+
+. drop BUS_RATIO OTH_RATIO TOT_RATIO
+
+. gen zip3_str = substr(ZIP, 1, 3)
+
+. * in a county, keep the zip with largest RES_RATIO to represent that county
+. bysort zip3_str (RES_RATIO): keep if _n==_N
+(53,283 observations deleted)
+
+. 
+. cd "$inter"
+C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3\intermediate datasets
+
+. save "zip_county.dta", replace
+file zip_county.dta saved
+
+. 
+. * prepare hpi_at_zip3 for merge
+. cd "$orig"
+C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3\original datasets
+
+. import excel "hpi_at_zip3.xlsx", cellrange(A6) firstrow clear
+(7 vars, 42,050 obs)
+
+. keep if (Year==2020 | Year==2021)
+(40,292 observations deleted)
+
+. drop HPI HPIwith1990base HPIwith2000base G
+
+. gen zip3_str = string(ThreeDigitZIPCode, "%03.0f")
+
+. 
+. cd "$inter"
+C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3\intermediate datasets
+
+. save "hpi_at_zip3_2020_2021.dta", replace
+file hpi_at_zip3_2020_2021.dta saved
+
+. 
+. * merge the two to add county codes to 3 digit zip observation in hpi_at_zip3 
+> data
+. merge m:1 zip3_str using "zip_county.dta"
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                            32
+        from master                         0  (_merge==1)
+        from using                         32  (_merge==2)
+
+    Matched                             1,758  (_merge==3)
+    -----------------------------------------
+
+. drop if Year==.
+(32 observations deleted)
+
+. drop ThreeDigitZIPCode zip3_str ZIP RES_RATIO _merge
+
+. destring COUNTY, replace
+COUNTY: all characters numeric; replaced as long
+
+. rename COUNTY county_fips
+
+. save "county_hpi.dta", replace
+file county_hpi.dta saved
+
+. 
+. * merge the census data to county_hpi data
+. merge m:1 county_fips using census_cleaned.dta
+(variable county_fips was long, now double to accommodate using data's values)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                         2,387
+        from master                         0  (_merge==1)
+        from using                      2,387  (_merge==2)
+
+    Matched                             1,758  (_merge==3)
+    -----------------------------------------
+
+. drop _merge
+
+. drop if Year==.
+(2,387 observations deleted)
+
+. save "county_hpi_population.dta", replace
+file county_hpi_population.dta saved
+
+. 
+. * import covid data and merge with county_hpi_population dataset
+. cd "$orig"
+C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3\original datasets
+
+. import delimited "us-counties-2020", clear
+(encoding automatically selected: ISO-8859-1)
+(6 vars, 884,737 obs)
+
+. rename fips county_fips
+
+. * keep the last row for each county to get yearly totals for each county
+. bysort county_fips (date): keep if _n==_N
+(881,518 observations deleted)
+
+. 
+. cd "$inter"
+C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3\intermediate datasets
+
+. save "county_covid_deaths_2020.dta", replace
+file county_covid_deaths_2020.dta saved
+
+. 
+. * merge with county_hpi_population dataset
+. use "county_hpi_population.dta", clear
+
+. merge m:1 county_fips using "county_covid_deaths_2020.dta"
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                         2,487
+        from master                        18  (_merge==1)
+        from using                      2,469  (_merge==2)
+
+    Matched                             1,740  (_merge==3)
+    -----------------------------------------
+
+. drop _merge date
+
+. drop if popestimate2020==.
+(2,469 observations deleted)
+
+. order state county county_fips popestimate2020 AnnualChange Year cases deaths
+
+. sort county_fips Year
+
+. 
+. * reshape so 2020 AnnualChange can be used as a control in the regression
+. * requires collapsing per county bc of the 3-digit ZIP approximations made ear
+> lier
+. collapse (mean) AnnualChange deaths popestimate2020, by(county_fips Year)
+
+. reshape wide AnnualChange, i(county_fips) j(Year)
+(j = 2020 2021)
+
+Data                               Long   ->   Wide
+-----------------------------------------------------------------------------
+Number of observations            1,512   ->   756         
+Number of variables                   5   ->   5           
+j variable (2 values)              Year   ->   (dropped)
+xij variables:
+                           AnnualChange   ->   AnnualChange2020 AnnualChange2021
+-----------------------------------------------------------------------------
+
+. 
+. * generate 2020 county COVID mortality rate
+. gen mort_rate = (deaths / popestimate2020) * 100000
+(6 missing values generated)
+
+. 
+. cd "$root"
+C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3
+
+. save "covid_county_mortality.dta", replace
+file covid_county_mortality.dta saved
+
+. 
+. * regression
+. reg AnnualChange2021 mort_rate AnnualChange2020
+
+      Source |       SS           df       MS      Number of obs   =       750
+-------------+----------------------------------   F(2, 747)       =    192.36
+       Model |  3664.88674         2  1832.44337   Prob > F        =    0.0000
+    Residual |  7116.09553       747  9.52623231   R-squared       =    0.3399
+-------------+----------------------------------   Adj R-squared   =    0.3382
+       Total |  10780.9823       749  14.3938348   Root MSE        =    3.0865
+
+-------------------------------------------------------------------------------
+AnnualCh~2021 | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+--------------+----------------------------------------------------------------
+    mort_rate |  -.0071976   .0015318    -4.70   0.000    -.0102048   -.0041904
+AnnualCh~2020 |   1.108471   .0596171    18.59   0.000     .9914343    1.225508
+        _cons |   7.924615   .3033389    26.12   0.000     7.329117    8.520113
+-------------------------------------------------------------------------------
+
+. 
+. * histograms
+. sum mort_rate if mort_rate < 400
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+   mort_rate |        745    103.7704    67.04293          0    396.727
+
+. histogram mort_rate if mort_rate < 400, frequency ///
+>     title("Distribution of County COVID-19 Mortality Rate, 2020") ///
+>     xtitle("Deaths per 100,000 Population") ///
+>     ytitle("Number of Counties") ///
+>     note("Mean = `: display %5.2f r(mean)', SD = `: display %5.2f r(sd)', n = 
+> 753." ///
+>          "One county omitted from display (mort_rate = 763.07) for visual clar
+> ity. Included in all analyses.")
+(bin=27, start=0, width=14.693592)
+
+. graph export "$root\hist_mort_rate.png", replace
+file C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3\hist_mort_rate.png
+    saved as PNG format
+
+. 
+. sum AnnualChange2021
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+AnnualC~2021 |        755     11.1482    3.818455      -1.76       25.7
+
+. histogram AnnualChange2021, frequency ///
+>     title("Distribution of County HPI Annual Change, 2021") ///
+>     xtitle("Annual HPI Change (%)") ///
+>     ytitle("Number of Counties") ///
+>     note("Mean = `: display %5.2f r(mean)', SD = `: display %5.2f r(sd)', n = 
+> 754")
+(bin=27, start=-1.76, width=1.017037)
+
+. graph export "$root\hist_AnnualChange2021.png", replace
+file C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment
+    3\hist_AnnualChange2021.png saved as PNG format
+
+. 
+. * summary statistics on other variables
+. sum mort_rate AnnualChange2021 AnnualChange2020 popestimate2020, detail
+
+                          mort_rate
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%     21.58976              0
+10%     33.05505              0       Obs                 750
+25%     54.84795              0       Sum of wgt.         750
+
+50%     92.53207                      Mean           106.3033
+                        Largest       Std. dev.      73.87091
+75%     139.2289       421.9409
+90%     192.3277       481.9405       Variance       5456.911
+95%     244.1881       484.1419       Skewness       1.814572
+99%     374.1815       616.2598       Kurtosis       8.920089
+
+                      2021 AnnualChange
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%         2.61          -1.76
+ 5%         5.22          -1.25
+10%         6.43             .1       Obs                 755
+25%         8.75            .62       Sum of wgt.         755
+
+50%        10.97                      Mean            11.1482
+                        Largest       Std. dev.      3.818455
+75%        13.47          22.55
+90%        15.75          23.29       Variance        14.5806
+95%        17.67          24.41       Skewness       .3004116
+99%        21.92           25.7       Kurtosis       3.777106
+
+                      2020 AnnualChange
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%        -1.51          -9.75
+ 5%         1.07          -8.68
+10%         1.61         -7.565       Obs                 755
+25%         2.58          -6.59       Sum of wgt.         755
+
+50%         3.63                      Mean           3.628058
+                        Largest       Std. dev.      1.897667
+75%         4.66           9.81
+90%          5.6          10.26       Variance       3.601139
+95%         6.46          10.62       Skewness      -.9911856
+99%         8.92           11.1       Kurtosis       11.37121
+
+                   (mean) popestimate2020
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%         2141           1185
+ 5%         5789           1268
+10%         9810           1536       Obs                 756
+25%        25427           1690       Sum of wgt.         756
+
+50%        73100                      Mean           287343.2
+                        Largest       Std. dev.      629199.4
+75%     293683.5        4579081
+90%       801582        4738253       Variance       3.96e+11
+95%      1152333        5108284       Skewness       7.279707
+99%      2635888        9943046       Kurtosis       87.79387
+
+. 
+. *This line should always be at the end
+. log close
+      name:  <unnamed>
+       log:  C:\Users\ebw26\Box\ECON 388 Stata\Data Assignment 3\Data_Assignment
+> _3_log.txt
+  log type:  text
+ closed on:  13 Apr 2026, 21:42:56
+--------------------------------------------------------------------------------
