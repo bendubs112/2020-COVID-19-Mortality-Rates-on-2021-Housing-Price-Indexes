@@ -31,4 +31,4 @@ An econometric analysis of 2020 county-level per-capita COVID-19 mortality rates
 
 ## Note
 
-The final dataset "covid_county_mortality.dta" is sufficient to run the code that executes the econometric analysis. If running the code that creates this dataset from the raw data files, first download those datasets to the appropriate directory and execute the code.
+The final dataset "covid_county_mortality.dta" is sufficient to run the code that executes the econometric analysis. If running the code that creates this dataset from the raw data files is desired, first download those datasets to the appropriate directory and execute the code.
